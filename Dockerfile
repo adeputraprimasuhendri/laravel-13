@@ -1,52 +1,52 @@
 FROM php:8.4-fpm
 
-# Arguments for user and uid (defaulting to laravel:1000)
+# Args
 ARG user=laravel
 ARG uid=1000
 
-# Install system dependencies
+# Install system deps
 RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    libzip-dev \
-    libicu-dev \
-    libsqlite3-dev \
-    zip \
-    unzip \
+    git curl zip unzip \
+    libpng-dev libonig-dev libxml2-dev libzip-dev libicu-dev libsqlite3-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install PHP extensions
+# PHP extensions
 RUN docker-php-ext-configure intl \
-    && docker-php-ext-install pdo_mysql mysqli mbstring exif pcntl bcmath gd zip intl pdo_sqlite
+    && docker-php-ext-install \
+        pdo_mysql mysqli mbstring exif pcntl bcmath gd zip intl pdo_sqlite
 
-# Get latest Composer
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www
 
-# Create system user to run Composer and Artisan Commands
-RUN useradd -G www-data,root -u $uid -d /home/$user $user
-RUN mkdir -p /home/$user/.composer && \
-    chown -R $user:$user /home/$user
+# ---- FIXED USER CREATION (idempotent + UID-safe) ----
+RUN if ! id -u ${user} >/dev/null 2>&1; then \
+        if getent passwd ${uid} >/dev/null; then \
+            usermod -l ${user} $(getent passwd ${uid} | cut -d: -f1); \
+            usermod -d /home/${user} -m ${user}; \
+        else \
+            useradd -G www-data,root -u ${uid} -d /home/${user} -m ${user}; \
+        fi; \
+    fi
 
-# Ensure /var/www is owned by the user
-RUN chown -R $user:$user /var/www
+# Composer home
+RUN mkdir -p /home/${user}/.composer \
+    && chown -R ${user}:${user} /home/${user}
 
-# Copy application files
-COPY --chown=$user:$user . /var/www
+# Copy only composer files first (cache optimization)
+COPY composer.json composer.lock* ./
 
-# Change current user to laravel
-USER $user
+RUN chown -R ${user}:${user} /var/www
 
-# Install dependencies (ignoring scripts as we'll run them if needed later)
+USER ${user}
+
+# Install deps first (better caching)
 RUN composer install --no-interaction --no-dev --optimize-autoloader
 
-# Expose port 9000
+# Copy rest of app
+COPY --chown=${user}:${user} . .
+
 EXPOSE 9000
 
-# Use artisan serve as the command (matching original intent)
 CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=9000"]
