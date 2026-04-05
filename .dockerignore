@@ -1,0 +1,15 @@
+vendor
+node_modules
+public/build
+storage/*.key
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+database/database.sqlite
+.env
+.git
+.DS_Store
+Dockerfile
+docker-compose.yml
+.dockerignore

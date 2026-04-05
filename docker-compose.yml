@@ -1,0 +1,19 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        user: ${USER:-laravel}
+        uid: ${UID:-1000}
+    ports:
+      - "9000:9000"
+    volumes:
+      - .:/var/www
+    environment:
+      - APP_ENV=local
+    networks:
+      - alrca-net
+
+networks:
+  alrca-net:
+    external: true
