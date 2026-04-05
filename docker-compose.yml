@@ -1,3 +1,5 @@
+version: "3.8"
+
 services:
   app:
     build:
@@ -11,10 +13,20 @@ services:
       - .:/var/www
       - vendor:/var/www/vendor
     environment:
-      - APP_ENV=local
+      APP_ENV: local
+      DB_CONNECTION: mysql
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      DB_DATABASE: andalasian
+      DB_USERNAME: andalasian
+      DB_PASSWORD: T01b01t01
     networks:
       - alrca-net
+    restart: unless-stopped
 
 networks:
   alrca-net:
     external: true
+
+volumes:
+  vendor:
