@@ -1,10 +1,9 @@
 FROM php:8.4-fpm
 
-# Args
 ARG user=laravel
 ARG uid=1000
 
-# Install system deps
+# System deps
 RUN apt-get update && apt-get install -y \
     git curl zip unzip \
     libpng-dev libonig-dev libxml2-dev libzip-dev libicu-dev libsqlite3-dev \
@@ -20,7 +19,7 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
 
-# ---- FIXED USER CREATION (idempotent + UID-safe) ----
+# User (safe)
 RUN if ! id -u ${user} >/dev/null 2>&1; then \
         if getent passwd ${uid} >/dev/null; then \
             usermod -l ${user} $(getent passwd ${uid} | cut -d: -f1); \
@@ -30,21 +29,27 @@ RUN if ! id -u ${user} >/dev/null 2>&1; then \
         fi; \
     fi
 
-# Composer home
+# Composer env (IMPORTANT)
+ENV COMPOSER_MEMORY_LIMIT=-1
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+# Prepare dirs
 RUN mkdir -p /home/${user}/.composer \
-    && chown -R ${user}:${user} /home/${user}
+    && chown -R ${user}:${user} /home/${user} /var/www
 
-# Copy only composer files first (cache optimization)
+# Copy only composer files
 COPY composer.json composer.lock* ./
-
-RUN chown -R ${user}:${user} /var/www
 
 USER ${user}
 
-# Install deps first (better caching)
-RUN composer install --no-interaction --no-dev --optimize-autoloader
+# ---- FIX: disable scripts during build ----
+RUN composer install \
+    --no-interaction \
+    --no-dev \
+    --optimize-autoloader \
+    --no-scripts
 
-# Copy rest of app
+# Copy full app
 COPY --chown=${user}:${user} . .
 
 EXPOSE 9000
